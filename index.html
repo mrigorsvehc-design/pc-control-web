@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0">
+<title>PC Control</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0D1117;
+    --bg-elev: #12161D;
+    --card: rgba(255,255,255,0.08);
+    --card-border: rgba(255,255,255,0.12);
+    --card-strong: rgba(255,255,255,0.13);
+    --accent: #2AABEE;
+    --accent-soft: rgba(42,171,238,0.18);
+    --success: #22C55E;
+    --error: #EF4444;
+    --warning: #F59E0B;
+    --text: #FFFFFF;
+    --text-dim: rgba(255,255,255,0.56);
+    --text-faint: rgba(255,255,255,0.32);
+    --radius-lg: 26px;
+    --radius-md: 20px;
+    --radius-sm: 14px;
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ height:100%; }
+  body{
+    margin:0;
+    background:
+      radial-gradient(circle at 15% 0%, rgba(42,171,238,0.10), transparent 45%),
+      radial-gradient(circle at 90% 15%, rgba(34,197,94,0.06), transparent 40%),
+      var(--bg);
+    color:var(--text);
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+    overflow-x:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+  button{ font-family:inherit; }
+
+  #splash{
+    position:fixed; inset:0; z-index:999;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    background:var(--bg);
+    transition:opacity .5s ease, visibility .5s ease;
+  }
+  #splash.hidden{ opacity:0; visibility:hidden; pointer-events:none; }
+  .splash-logo{
+    width:84px; height:84px; border-radius:26px;
+    background:linear-gradient(155deg, rgba(42,171,238,0.25), rgba(42,171,238,0.05));
+    border:1px solid rgba(42,171,238,0.35);
+    display:flex; align-items:center; justify-content:center;
+    font-size:38px;
+    opacity:0; transform:scale(.8);
+    animation: logoIn .7s cubic-bezier(.2,.9,.25,1) forwards;
+    box-shadow:0 0 0 rgba(42,171,238,0);
+  }
+  @keyframes logoIn{
+    0%{ opacity:0; transform:scale(.8); }
+    60%{ opacity:1; transform:scale(1.04); box-shadow:0 0 40px rgba(42,171,238,.35); }
+    100%{ opacity:1; transform:scale(1); box-shadow:0 0 26px rgba(42,171,238,.22); }
+  }
+  .splash-title{
+    margin-top:22px; font-size:21px; font-weight:800; letter-spacing:-.01em;
+    opacity:0; animation: fadeUp .6s ease .3s forwards;
+  }
+  .splash-sub{
+    margin-top:6px; font-size:13px; color:var(--text-dim); font-weight:500;
+    opacity:0; animation: fadeUp .6s ease .45s forwards;
+  }
+  .splash-sub .dots span{ animation: blink 1.4s infinite; }
+  .splash-sub .dots span:nth-child(2){ animation-delay:.2s; }
+  .splash-sub .dots span:nth-child(3){ animation-delay:.4s; }
+  @keyframes blink{ 0%,80%,100%{ opacity:.2; } 40%{ opacity:1; } }
+  @keyframes fadeUp{ from{ opacity:0; transform:translateY(8px); } to{ opacity:1; transform:translateY(0); } }
+  .splash-bar{
+    width:140px; height:3px; border-radius:2px; margin-top:26px;
+    background:rgba(255,255,255,0.1); overflow:hidden;
+    opacity:0; animation: fadeUp .5s ease .55s forwards;
+  }
+  .splash-bar-fill{
+    height:100%; width:0%; border-radius:2px;
+    background:linear-gradient(90deg,var(--accent),#5FD0FF);
+    transition:width 1.3s cubic-bezier(.4,0,.2,1);
+  }
+
+  #app{ opacity:0; transition:opacity .5s ease; padding-bottom:96px; min-height:100vh; }
+  #app.visible{ opacity:1; }
+
+  .topspace{ height:env(safe-area-inset-top,0px); }
+  .header{ padding:18px 20px 4px; }
+  .header .eyebrow{ font-size:12px; font-weight:600; color:var(--accent); letter-spacing:.04em; }
+  .header h1{ margin:2px 0 0; font-size:26px; font-weight:800; letter-spacing:-.02em; }
+
+  .page-viewport{ overflow:hidden; }
+  .pages{ display:flex; width:300%; transition:transform .38s cubic-bezier(.4,0,.2,1); }
+  .page{ width:33.3333%; flex-shrink:0; padding:6px 20px 20px; }
+
+  .glass{
+    background:var(--card);
+    border:1px solid var(--card-border);
+    border-radius:var(--radius-lg);
+    backdrop-filter:blur(22px) saturate(150%);
+    -webkit-backdrop-filter:blur(22px) saturate(150%);
+    box-shadow:0 10px 30px rgba(0,0,0,.35);
+  }
+
+  .status-card{
+    padding:18px 20px; margin:14px 0 18px;
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .status-left{ display:flex; align-items:center; gap:14px; }
+  .status-icon{
+    width:46px; height:46px; border-radius:16px;
+    background:var(--accent-soft); display:flex; align-items:center; justify-content:center;
+    font-size:21px;
+  }
+  .status-name{ font-size:15px; font-weight:700; }
+  .status-line{ display:flex; align-items:center; gap:6px; margin-top:3px; font-size:12.5px; color:var(--text-dim); }
+  .dot{ width:7px; height:7px; border-radius:50%; background:var(--success); box-shadow:0 0 6px rgba(34,197,94,.8); }
+  .dot.off{ background:var(--text-faint); box-shadow:none; }
+  .status-uptime{ text-align:right; font-size:12px; color:var(--text-dim); }
+  .status-uptime b{ display:block; font-size:14px; color:var(--text); font-weight:700; }
+
+  .power-btn{
+    width:100%; border:none; cursor:pointer;
+    padding:22px; border-radius:28px; margin-bottom:16px;
+    background:linear-gradient(155deg, rgba(239,68,68,.22), rgba(239,68,68,.06));
+    border:1px solid rgba(239,68,68,.3);
+    color:var(--text);
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    font-size:16px; font-weight:700;
+    transition:transform .12s ease, filter .15s ease;
+  }
+  .power-btn:active{ transform:scale(.97); filter:brightness(1.1); }
+  .power-btn .ico{ font-size:20px; }
+  .power-btn:disabled{ opacity:.5; }
+
+  .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px; min-width:0; }
+  .grid3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:9px; margin-bottom:16px; }
+  .grid4{ display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:8px; margin-bottom:16px; }
+  .grid4 .secondary-btn{ min-width:0; padding:12px 4px; font-size:12px; }
+  .action-card{
+    min-width:0; overflow:hidden;
+    padding:14px 8px; text-align:left; cursor:pointer;
+    display:flex; flex-direction:column; gap:8px; position:relative;
+    transition:transform .1s ease, background .15s ease;
+  }
+  .action-card:active{ transform:scale(.96); background:var(--card-strong); }
+  .action-card .ico{ font-size:20px; }
+  .action-card .lbl{ font-size:11.5px; font-weight:600; line-height:1.25; overflow-wrap:break-word; }
+  .action-card:disabled{ opacity:.55; }
+  .soon-badge{
+    position:absolute; top:10px; right:10px;
+    font-size:9px; font-weight:700; letter-spacing:.03em;
+    color:var(--warning); background:rgba(245,158,11,.15);
+    padding:3px 7px; border-radius:20px;
+  }
+
+  .list-card{
+    display:flex; align-items:center; gap:14px; padding:15px 16px;
+    margin-bottom:10px; cursor:pointer; transition:transform .1s ease, background .15s ease;
+  }
+  .list-card:active{ transform:scale(.98); background:var(--card-strong); }
+  .list-card .ico{
+    width:38px; height:38px; border-radius:12px; background:var(--accent-soft);
+    display:flex; align-items:center; justify-content:center; font-size:17px; flex-shrink:0;
+  }
+  .list-card .txt{ flex:1; }
+  .list-card .lbl{ font-size:14px; font-weight:600; }
+  .list-card .sub{ font-size:11.5px; color:var(--text-dim); margin-top:1px; }
+  .list-card .chev{ color:var(--text-faint); font-size:14px; }
+
+  .section-title{ font-size:12px; font-weight:700; color:var(--text-dim); letter-spacing:.06em; text-transform:uppercase; margin:18px 2px 10px; }
+
+  .metric-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px; }
+  .metric-card{ padding:15px 16px; }
+  .metric-top{ display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+  .metric-top .lbl{ font-size:12px; font-weight:600; color:var(--text-dim); display:flex; align-items:center; gap:6px; }
+  .metric-top .val{ font-size:17px; font-weight:800; }
+  .pbar{ height:6px; border-radius:4px; background:rgba(255,255,255,.08); overflow:hidden; }
+  .pbar-fill{ height:100%; border-radius:4px; background:var(--accent); width:0%; transition:width .6s ease; }
+  .metric-extra{ font-size:11px; color:var(--text-faint); margin-top:8px; }
+
+  .usage-card{ padding:16px; margin-bottom:16px; }
+  .usage-row{ display:flex; justify-content:space-between; padding:9px 0; border-bottom:1px solid rgba(255,255,255,.06); font-size:13px; }
+  .usage-row:last-child{ border-bottom:none; }
+  .usage-row span:first-child{ color:var(--text-dim); }
+  .usage-row span:last-child{ font-weight:700; }
+
+  .chart-card{ padding:16px; margin-bottom:14px; }
+  .chart-card .lbl{ font-size:12.5px; font-weight:700; color:var(--text-dim); margin-bottom:10px; }
+  .chart-card canvas{ width:100% !important; height:110px !important; }
+
+  .refresh-btn{
+    width:100%; padding:14px; border:none; border-radius:var(--radius-md); cursor:pointer;
+    background:var(--accent-soft); color:var(--accent); font-weight:700; font-size:13.5px;
+    margin-bottom:18px; display:flex; align-items:center; justify-content:center; gap:8px;
+    transition:transform .1s ease;
+  }
+  .refresh-btn:active{ transform:scale(.97); }
+
+  .bottom-nav{
+    position:fixed; left:16px; right:16px; bottom:calc(14px + env(safe-area-inset-bottom,0px));
+    display:flex; padding:8px; z-index:50;
+  }
+  .nav-item{
+    flex:1; border:none; background:transparent; cursor:pointer;
+    display:flex; flex-direction:column; align-items:center; gap:3px;
+    padding:9px 0; border-radius:18px; color:var(--text-faint);
+    font-size:10.5px; font-weight:600; transition:all .2s ease;
+  }
+  .nav-item .ico{ font-size:19px; }
+  .nav-item.active{ color:var(--accent); background:var(--accent-soft); }
+
+  .sheet{
+    position:fixed; inset:0; z-index:200; background:var(--bg);
+    transform:translateY(100%); transition:transform .35s cubic-bezier(.32,.72,0,1);
+    display:flex; flex-direction:column;
+  }
+  .sheet.open{ transform:translateY(0); }
+  .sheet-header{
+    display:flex; align-items:center; gap:14px; padding:18px 20px 14px;
+    border-bottom:1px solid var(--card-border);
+  }
+  .back-btn{
+    width:36px; height:36px; border-radius:12px; border:none; background:var(--card);
+    color:var(--text); font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+  }
+  .sheet-title{ font-size:16px; font-weight:700; }
+  .sheet-body{ flex:1; overflow-y:auto; padding:18px 20px 40px; }
+
+  textarea.field, input.field{
+    width:100%; background:var(--card); border:1px solid var(--card-border);
+    border-radius:var(--radius-md); padding:14px 16px; color:var(--text);
+    font-family:inherit; font-size:14px; outline:none;
+  }
+  textarea.field{ min-height:110px; resize:vertical; }
+  input.field:focus, textarea.field:focus{ border-color:var(--accent); }
+
+  .primary-btn{
+    width:100%; padding:15px; border:none; border-radius:var(--radius-md); cursor:pointer;
+    background:var(--accent); color:#04202E; font-weight:700; font-size:14px; margin-top:14px;
+    transition:transform .1s ease;
+  }
+  .primary-btn:active{ transform:scale(.97); }
+  .primary-btn:disabled{ opacity:.5; }
+
+  .shot-frame{
+    width:100%; border-radius:var(--radius-md); overflow:hidden; margin-top:16px;
+    background:var(--card); border:1px solid var(--card-border); min-height:200px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .shot-frame img{ width:100%; display:block; }
+  .shot-actions{ display:flex; gap:10px; margin-top:12px; }
+  .shot-actions button{ flex:1; }
+  .secondary-btn{
+    padding:13px; border-radius:var(--radius-md); border:1px solid var(--card-border);
+    background:var(--card); color:var(--text); font-weight:600; font-size:13px; cursor:pointer;
+  }
+
+  .terminal{
+    background:#000; border-radius:var(--radius-md); padding:14px 16px; margin-top:14px;
+    font-family:'SF Mono',Menlo,Consolas,monospace; font-size:12.5px; line-height:1.6;
+    min-height:180px; max-height:40vh; overflow-y:auto; color:#8FE38F;
+    border:1px solid var(--card-border);
+  }
+  .terminal .cmdline{ color:#7FC8FF; }
+  .terminal .out{ color:#C9D1D9; white-space:pre-wrap; }
+  .terminal .err{ color:var(--error); }
+
+  .explorer-row{
+    display:flex; align-items:center; gap:12px; padding:13px 4px;
+    border-bottom:1px solid rgba(255,255,255,.06); cursor:pointer;
+  }
+  .explorer-row .ico{ font-size:17px; }
+  .explorer-row .name{ flex:1; font-size:13.5px; }
+  .explorer-path{ font-size:11.5px; color:var(--text-dim); margin-bottom:10px; word-break:break-all; }
+
+  .spin{
+    width:26px; height:26px; border-radius:50%;
+    border:3px solid rgba(255,255,255,.15); border-top-color:var(--accent);
+    animation:spin .8s linear infinite; margin:20px auto;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  .center-note{ text-align:center; color:var(--text-dim); font-size:13px; margin-top:6px; }
+
+  #toasts{ position:fixed; top:calc(14px + env(safe-area-inset-top,0px)); left:16px; right:16px; z-index:500; display:flex; flex-direction:column; gap:8px; }
+  .toast{
+    padding:13px 16px; border-radius:var(--radius-sm);
+    display:flex; align-items:center; gap:10px; font-size:13px; font-weight:600;
+    transform:translateY(-14px); opacity:0; transition:all .25s ease;
+  }
+  .toast.show{ transform:translateY(0); opacity:1; }
+  .toast.info{ border-left:3px solid var(--accent); }
+  .toast.ok{ border-left:3px solid var(--success); }
+  .toast.err{ border-left:3px solid var(--error); }
+  .toast .tico{ font-size:15px; }
+</style>
+</head>
+<body>
+
+<div id="splash">
+  <div class="splash-logo">🖥️</div>
+  <div class="splash-title">PC Control</div>
+  <div class="splash-sub">Connecting<span class="dots"><span>.</span><span>.</span><span>.</span></span></div>
+  <div class="splash-bar"><div class="splash-bar-fill" id="splash-fill"></div></div>
+</div>
+
+<div id="toasts"></div>
+
+<div id="app">
+  <div class="topspace"></div>
+  <div class="header">
+    <div class="eyebrow" id="header-eyebrow">УПРАВЛЕНИЕ</div>
+    <h1 id="header-title">Мой ПК</h1>
+  </div>
+
+  <div class="page-viewport">
+    <div class="pages" id="pages">
+
+      <div class="page">
+        <div class="status-card glass">
+          <div class="status-left">
+            <div class="status-icon">🖥️</div>
+            <div>
+              <div class="status-name">Мой компьютер</div>
+              <div class="status-line"><span class="dot" id="pc-dot"></span><span id="pc-status-text">проверка...</span></div>
+            </div>
+          </div>
+          <div class="status-uptime"><b id="pc-uptime">—</b>аптайм</div>
+        </div>
+
+        <button class="power-btn" id="power-btn"><span class="ico">🔴</span><span>Выключить ПК</span></button>
+
+        <div class="grid3">
+          <button class="action-card glass" data-action="sleep" data-label="Сон"><span class="ico">🌙</span><span class="lbl">Сон</span></button>
+          <button class="action-card glass" data-action="lock" data-label="Блокировка"><span class="ico">🔒</span><span class="lbl">Блокировка</span></button>
+          <button class="action-card glass" data-action="reboot" data-label="Перезагрузка"><span class="ico">🔄</span><span class="lbl">Перезагрузка</span></button>
+          <button class="action-card glass" data-action="standby" data-label="Режим ожидания"><span class="ico">⏳</span><span class="lbl">Ожидание</span></button>
+          <button class="action-card glass" id="open-screenshot"><span class="ico">📸</span><span class="lbl">Скриншот</span></button>
+          <button class="action-card glass" id="open-message"><span class="ico">💬</span><span class="lbl">Сообщение</span></button>
+          <button class="action-card glass" data-action="minimize_windows" data-label="Свернуть окна"><span class="ico">🪟</span><span class="lbl">Свернуть окна</span></button>
+          <button class="action-card glass" id="open-url-quick"><span class="ico">🌐</span><span class="lbl">Открыть сайт</span></button>
+          <button class="action-card glass" id="open-app-quick"><span class="ico">📂</span><span class="lbl">Открыть программу</span></button>
+          <button class="action-card glass" id="open-folder-quick"><span class="ico">📁</span><span class="lbl">Открыть папку</span></button>
+          <button class="action-card glass" id="open-cmd"><span class="ico">⌨️</span><span class="lbl">CMD</span></button>
+          <button class="action-card glass" id="open-volume"><span class="ico">🔊</span><span class="lbl">Громкость</span></button>
+        </div>
+      </div>
+
+      <div class="page">
+        <div class="status-card glass">
+          <div class="status-left">
+            <div class="status-icon">📊</div>
+            <div>
+              <div class="status-name">PC STATUS</div>
+              <div class="status-line"><span class="dot" id="stats-dot"></span><span id="stats-status-text">нет данных</span></div>
+            </div>
+          </div>
+        </div>
+
+        <button class="refresh-btn" id="refresh-stats"><span>🔄</span><span>Обновить статистику</span></button>
+
+        <div class="metric-grid" id="metric-grid"></div>
+
+        <div class="usage-card glass">
+          <div class="section-title" style="margin-top:0;">Время использования</div>
+          <div class="usage-row"><span>Сегодня</span><span id="u-today">—</span></div>
+          <div class="usage-row"><span>Неделя</span><span id="u-week">—</span></div>
+          <div class="usage-row"><span>Месяц</span><span id="u-month">—</span></div>
+          <div class="usage-row"><span>Сессия</span><span id="u-session">—</span></div>
+          <div class="usage-row"><span>Всё время</span><span id="u-total">—</span></div>
+        </div>
+
+        <div class="section-title">Графики</div>
+        <div class="chart-card glass"><div class="lbl">🧠 CPU</div><canvas id="chart-cpu"></canvas></div>
+        <div class="chart-card glass"><div class="lbl">💾 RAM</div><canvas id="chart-ram"></canvas></div>
+        <div class="chart-card glass"><div class="lbl">🎮 GPU</div><canvas id="chart-gpu"></canvas></div>
+        <div class="chart-card glass"><div class="lbl">🌡 Температура</div><canvas id="chart-temp"></canvas></div>
+      </div>
+
+      <div class="page">
+        <div class="list-card glass" id="extra-message"><div class="ico">💬</div><div class="txt"><div class="lbl">Отправить сообщение</div><div class="sub">Всплывающее окно на ПК</div></div><div class="chev">›</div></div>
+        <div class="list-card glass" id="extra-screenshot"><div class="ico">📸</div><div class="txt"><div class="lbl">Сделать скриншот</div><div class="sub">Снимок рабочего стола</div></div><div class="chev">›</div></div>
+        <div class="list-card glass" id="extra-explorer"><div class="ico">📂</div><div class="txt"><div class="lbl">Проводник</div><div class="sub">Файлы и папки на ПК</div></div><div class="chev">›</div></div>
+        <div class="list-card glass" id="extra-clipboard"><div class="ico">📋</div><div class="txt"><div class="lbl">Буфер обмена</div><div class="sub">Синхронизация с ПК</div></div><div class="chev">›</div></div>
+        <div class="list-card glass" id="extra-music"><div class="ico">🎵</div><div class="txt"><div class="lbl">Управление музыкой</div><div class="sub">Play / Pause / Next</div></div><div class="chev">›</div></div>
+        <div class="list-card glass" id="extra-mouse"><div class="ico">🖱️</div><div class="txt"><div class="lbl">Управление мышью</div><div class="sub">Тачпад</div></div><div class="chev">›</div></div>
+        <div class="list-card glass" id="extra-keyboard"><div class="ico">⌨️</div><div class="txt"><div class="lbl">Клавиатура</div><div class="sub">Удалённый ввод текста</div></div><div class="chev">›</div></div>
+        <div class="list-card glass" id="extra-url"><div class="ico">🌐</div><div class="txt"><div class="lbl">Открыть сайт</div></div><div class="chev">›</div></div>
+        <div class="list-card glass" id="extra-settings"><div class="ico">⚙️</div><div class="txt"><div class="lbl">Настройки</div></div><div class="chev">›</div></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="bottom-nav glass">
+  <button class="nav-item active" data-tab="0"><span class="ico">🏠</span><span>Управление</span></button>
+  <button class="nav-item" data-tab="1"><span class="ico">📊</span><span>Статистика</span></button>
+  <button class="nav-item" data-tab="2"><span class="ico">⚙️</span><span>Дополнительно</span></button>
+</div>
+
+<div class="sheet" id="sheet-message">
+  <div class="sheet-header"><button class="back-btn" data-close="sheet-message">←</button><div class="sheet-title">Сообщение компьютеру</div></div>
+  <div class="sheet-body">
+    <textarea class="field" id="msg-text" placeholder="Введите текст..."></textarea>
+    <button class="primary-btn" id="msg-send">📤 Отправить</button>
+  </div>
+</div>
+
+<div class="sheet" id="sheet-screenshot">
+  <div class="sheet-header"><button class="back-btn" data-close="sheet-screenshot">←</button><div class="sheet-title">Скриншот экрана</div></div>
+  <div class="sheet-body">
+    <div class="shot-frame" id="shot-frame"><div class="spin"></div></div>
+    <div class="center-note" id="shot-note">Загружаю снимок экрана...</div>
+    <div class="shot-actions">
+      <button class="secondary-btn" id="shot-refresh">🔄 Обновить</button>
+      <a class="secondary-btn" id="shot-download" style="text-align:center;text-decoration:none;">⬇ Скачать</a>
+    </div>
+  </div>
+</div>
+
+<div class="sheet" id="sheet-cmd">
+  <div class="sheet-header"><button class="back-btn" data-close="sheet-cmd">←</button><div class="sheet-title">Командная строка</div></div>
+  <div class="sheet-body">
+    <input class="field" id="cmd-input" placeholder="Введите команду CMD">
+    <button class="primary-btn" id="cmd-run">▶ Выполнить</button>
+    <div class="terminal" id="cmd-terminal">C:\&gt; готов к вводу</div>
+  </div>
+</div>
+
+<div class="sheet" id="sheet-explorer">
+  <div class="sheet-header"><button class="back-btn" data-close="sheet-explorer">←</button><div class="sheet-title">Проводник</div></div>
+  <div class="sheet-body">
+    <div class="explorer-path" id="explorer-path">C:\</div>
+    <div id="explorer-list"></div>
+  </div>
+</div>
+
+<div class="sheet" id="sheet-quick">
+  <div class="sheet-header"><button class="back-btn" data-close="sheet-quick">←</button><div class="sheet-title" id="quick-title">Ввод</div></div>
+  <div class="sheet-body">
+    <input class="field" id="quick-input" placeholder="">
+    <button class="primary-btn" id="quick-send">Выполнить</button>
+  </div>
+</div>
+
+<div class="sheet" id="sheet-volume">
+  <div class="sheet-header"><button class="back-btn" data-close="sheet-volume">←</button><div class="sheet-title">Громкость</div></div>
+  <div class="sheet-body">
+    <div class="grid2">
+      <button class="action-card glass" data-action="volume_up" data-label="Громче"><span class="ico">🔊</span><span class="lbl">Громче</span></button>
+      <button class="action-card glass" data-action="volume_down" data-label="Тише"><span class="ico">🔉</span><span class="lbl">Тише</span></button>
+    </div>
+    <button class="power-btn" data-action="volume_mute" data-label="Выключить звук" style="margin-top:2px;"><span class="ico">🔇</span><span>Выключить звук</span></button>
+  </div>
+</div>
+
+<div class="sheet" id="sheet-clipboard">
+  <div class="sheet-header"><button class="back-btn" data-close="sheet-clipboard">←</button><div class="sheet-title">Буфер обмена</div></div>
+  <div class="sheet-body">
+    <textarea class="field" id="clip-text" placeholder="Буфер обмена ПК появится здесь..."></textarea>
+    <button class="primary-btn" id="clip-get">🔄 Получить с ПК</button>
+    <button class="primary-btn" id="clip-set" style="background:var(--card);color:var(--text);border:1px solid var(--card-border);margin-top:10px;">📋 Отправить на ПК</button>
+  </div>
+</div>
+
+<div class="sheet" id="sheet-music">
+  <div class="sheet-header"><button class="back-btn" data-close="sheet-music">←</button><div class="sheet-title">Управление музыкой</div></div>
+  <div class="sheet-body">
+    <div class="status-card glass" style="margin-top:0;">
+      <div class="status-left">
+        <div class="status-icon">🎵</div>
+        <div><div class="status-name" id="music-track">Сейчас играет — неизвестно</div><div class="status-line">на текущем ПК</div></div>
+      </div>
+    </div>
+    <div class="grid3">
+      <button class="action-card glass" data-music="prev"><span class="ico">⏮</span><span class="lbl">Назад</span></button>
+      <button class="action-card glass" data-music="playpause"><span class="ico">⏯</span><span class="lbl">Пауза/Play</span></button>
+      <button class="action-card glass" data-music="next"><span class="ico">⏭</span><span class="lbl">Дальше</span></button>
+    </div>
+  </div>
+</div>
+
+<div class="sheet" id="sheet-mouse">
+  <div class="sheet-header"><button class="back-btn" data-close="sheet-mouse">←</button><div class="sheet-title">Управление мышью</div></div>
+  <div class="sheet-body">
+    <div class="glass" id="touchpad" style="height:280px;border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;color:var(--text-faint);font-size:12.5px;touch-action:none;user-select:none;">Веди пальцем здесь</div>
+    <div class="grid2" style="margin-top:14px;">
+      <button class="secondary-btn" id="mouse-left" style="padding:16px;">Левая кнопка</button>
+      <button class="secondary-btn" id="mouse-right" style="padding:16px;">Правая кнопка</button>
+    </div>
+  </div>
+</div>
+
+<div class="sheet" id="sheet-keyboard">
+  <div class="sheet-header"><button class="back-btn" data-close="sheet-keyboard">←</button><div class="sheet-title">Клавиатура</div></div>
+  <div class="sheet-body">
+    <input class="field" id="kb-text" placeholder="Введи текст — он напечатается на ПК">
+    <button class="primary-btn" id="kb-send">⌨️ Ввести текст</button>
+    <div class="grid4" style="margin-top:16px;">
+      <button class="secondary-btn" data-key="enter">Enter</button>
+      <button class="secondary-btn" data-key="backspace">⌫</button>
+      <button class="secondary-btn" data-key="esc">Esc</button>
+      <button class="secondary-btn" data-key="tab">Tab</button>
+    </div>
+  </div>
+</div>
+
+<div class="sheet" id="sheet-settings">
+  <div class="sheet-header"><button class="back-btn" data-close="sheet-settings">←</button><div class="sheet-title">Настройки</div></div>
+  <div class="sheet-body">
+    <div class="list-card glass"><div class="ico">🌐</div><div class="txt"><div class="lbl">Сервер</div><div class="sub" id="settings-server"></div></div></div>
+    <div class="list-card glass"><div class="ico">📶</div><div class="txt"><div class="lbl">Статус связи</div><div class="sub" id="settings-status">—</div></div></div>
+  </div>
+</div>
+
+<script>
+  const SERVER_URL = "https://pc-control-1.onrender.com";
+  const tg = window.Telegram ? window.Telegram.WebApp : null;
+  if (tg) { try{ tg.ready(); tg.expand(); if (tg.setHeaderColor) tg.setHeaderColor('#0D1117'); }catch(e){} }
+  const initData = tg ? tg.initData : "";
+
+  document.getElementById("settings-server").textContent = SERVER_URL.replace("https://","");
+
+  window.addEventListener("load", () => {
+    requestAnimationFrame(() => { document.getElementById("splash-fill").style.width = "100%"; });
+    setTimeout(() => {
+      document.getElementById("splash").classList.add("hidden");
+      document.getElementById("app").classList.add("visible");
+      checkConnection();
+    }, 1500);
+  });
+
+  function toast(text, type, icon){
+    const el = document.createElement("div");
+    el.className = "toast glass " + (type || "info");
+    el.innerHTML = '<span class="tico">' + (icon || (type==='ok'?'✅':type==='err'?'🔴':'🟡')) + '</span><span>' + text + '</span>';
+    document.getElementById("toasts").appendChild(el);
+    requestAnimationFrame(() => el.classList.add("show"));
+    setTimeout(() => { el.classList.remove("show"); setTimeout(()=>el.remove(), 300); }, 3200);
+    return el;
+  }
+
+  const pagesEl = document.getElementById("pages");
+  const headerTitle = document.getElementById("header-title");
+  const headerEyebrow = document.getElementById("header-eyebrow");
+  const tabMeta = [
+    {title:"Мой ПК", eyebrow:"УПРАВЛЕНИЕ"},
+    {title:"Статистика", eyebrow:"МОНИТОРИНГ"},
+    {title:"Дополнительно", eyebrow:"ИНСТРУМЕНТЫ"}
+  ];
+  document.querySelectorAll(".nav-item").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const idx = parseInt(btn.dataset.tab, 10);
+      document.querySelectorAll(".nav-item").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      pagesEl.style.transform = "translateX(-" + (idx * 33.3333) + "%)";
+      headerTitle.textContent = tabMeta[idx].title;
+      headerEyebrow.textContent = tabMeta[idx].eyebrow;
+    });
+  });
+
+  function openSheet(id){ document.getElementById(id).classList.add("open"); }
+  function closeSheet(id){ document.getElementById(id).classList.remove("open"); }
+  document.querySelectorAll("[data-close]").forEach(btn => {
+    btn.addEventListener("click", () => closeSheet(btn.dataset.close));
+  });
+
+  async function sendCommand(action, params, opts){
+    opts = opts || {};
+    if(!initData){
+      toast("Открой приложение через кнопку бота в Telegram", "err");
+      return null;
+    }
+    if(!opts.silent) toast('Отправляю команду «' + (opts.label || action) + '»...', "info");
+    try{
+      const res = await fetch(SERVER_URL + "/api/command", {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ initData, action, params: params || {} })
+      });
+      const data = await res.json();
+      if(!res.ok){ if(!opts.silent) toast('Ошибка: ' + (data.error||'неизвестная'), "err"); return null; }
+      return await pollResult(data.command_id, opts.timeout || 20000);
+    }catch(e){
+      if(!opts.silent) toast("Нет связи с сервером", "err");
+      return null;
+    }
+  }
+
+  function pollResult(commandId, timeoutMs){
+    const started = Date.now();
+    return new Promise(resolve => {
+      (async function tick(){
+        try{
+          const res = await fetch(SERVER_URL + "/api/result/" + commandId);
+          const data = await res.json();
+          if(data.status === "done"){ resolve(data.result); return; }
+          if(Date.now() - started > timeoutMs){ resolve(null); return; }
+          setTimeout(tick, 1200);
+        }catch(e){ resolve(null); }
+      })();
+    });
+  }
+
+  document.querySelectorAll("[data-action]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const action = btn.dataset.action, label = btn.dataset.label || action;
+      btn.disabled = true;
+      const result = await sendCommand(action, {}, {label});
+      btn.disabled = false;
+      if(result){ toast('«' + label + '» выполнено', "ok"); }
+      else{ toast('ПК не ответил на «' + label + '» — проверь, подключён ли агент', "err"); }
+    });
+  });
+
+  document.getElementById("power-btn").addEventListener("click", async function(){
+    this.disabled = true;
+    const result = await sendCommand("shutdown", {}, {label:"Выключение"});
+    this.disabled = false;
+    toast(result ? "Компьютер выключается" : "ПК не ответил — агент офлайн", result ? "ok":"err");
+  });
+
+  document.getElementById("open-message").addEventListener("click", () => openSheet("sheet-message"));
+  document.getElementById("extra-message").addEventListener("click", () => openSheet("sheet-message"));
+  document.getElementById("msg-send").addEventListener("click", async () => {
+    const text = document.getElementById("msg-text").value.trim();
+    if(!text) return;
+    const btn = document.getElementById("msg-send"); btn.disabled = true;
+    const result = await sendCommand("message", {text}, {label:"Сообщение", silent:true});
+    btn.disabled = false;
+    if(result){ toast("Сообщение отправлено", "ok"); document.getElementById("msg-text").value=""; closeSheet("sheet-message"); }
+    else{ toast("Не удалось отправить — агент офлайн", "err"); }
+  });
+
+  async function runScreenshot(){
+    document.getElementById("shot-frame").innerHTML = '<div class="spin"></div>';
+    document.getElementById("shot-note").textContent = "Загружаю снимок экрана...";
+    const result = await sendCommand("screenshot", {}, {silent:true, timeout:20000});
+    if(result && result.image){
+      document.getElementById("shot-frame").innerHTML = '<img src="' + result.image + '">';
+      document.getElementById("shot-note").textContent = "Готово";
+      document.getElementById("shot-download").href = result.image;
+      document.getElementById("shot-download").setAttribute("download","screenshot.png");
+    } else {
+      document.getElementById("shot-frame").innerHTML = '<div class="center-note" style="margin:0;">⏱ Нет ответа от ПК</div>';
+      document.getElementById("shot-note").textContent = "Проверь, что агент запущен";
+    }
+  }
+  document.getElementById("open-screenshot").addEventListener("click", () => { openSheet("sheet-screenshot"); runScreenshot(); });
+  document.getElementById("extra-screenshot").addEventListener("click", () => { openSheet("sheet-screenshot"); runScreenshot(); });
+  document.getElementById("shot-refresh").addEventListener("click", runScreenshot);
+
+  document.getElementById("open-cmd").addEventListener("click", () => openSheet("sheet-cmd"));
+  document.getElementById("cmd-run").addEventListener("click", async () => {
+    const input = document.getElementById("cmd-input");
+    const command = input.value.trim();
+    if(!command) return;
+    const term = document.getElementById("cmd-terminal");
+    term.innerHTML += '<br><span class="cmdline">C:\\&gt; ' + command + '</span>';
+    input.value = "";
+    const result = await sendCommand("cmd", {command}, {silent:true, timeout:20000});
+    if(result && result.output !== undefined){
+      term.innerHTML += '<br><span class="out">' + result.output + '</span>';
+    } else {
+      term.innerHTML += '<br><span class="err">⏱ нет ответа от агента</span>';
+    }
+    term.scrollTop = term.scrollHeight;
+  });
+
+  let explorerPath = "C:\\";
+  async function loadExplorer(path){
+    document.getElementById("explorer-path").textContent = path;
+    document.getElementById("explorer-list").innerHTML = '<div class="spin"></div>';
+    const result = await sendCommand("list_dir", {path}, {silent:true, timeout:20000});
+    const list = document.getElementById("explorer-list");
+    list.innerHTML = "";
+    if(!result || !result.entries){
+      list.innerHTML = '<div class="center-note">⏱ Нет ответа от ПК — агент офлайн</div>';
+      return;
+    }
+    explorerPath = path;
+    if(path !== "C:\\"){
+      const up = document.createElement("div");
+      up.className = "explorer-row"; up.innerHTML = '<span class="ico">⬆</span><span class="name">Назад</span>';
+      up.addEventListener("click", () => {
+        const parent = path.replace(/\\[^\\]+\\?$/, "\\") || "C:\\";
+        loadExplorer(parent);
+      });
+      list.appendChild(up);
+    }
+    result.entries.forEach(entry => {
+      const row = document.createElement("div");
+      row.className = "explorer-row";
+      row.innerHTML = '<span class="ico">' + (entry.type === 'dir' ? '📁' : '📄') + '</span><span class="name">' + entry.name + '</span>';
+      row.addEventListener("click", () => {
+        if(entry.type === "dir") loadExplorer(path.replace(/\\?$/, "\\") + entry.name);
+      });
+      list.appendChild(row);
+    });
+  }
+  document.getElementById("extra-explorer").addEventListener("click", () => { openSheet("sheet-explorer"); loadExplorer(explorerPath); });
+
+  let quickAction = null, quickParamKey = "value";
+  function openQuick(title, placeholder, action, paramKey){
+    quickAction = action; quickParamKey = paramKey;
+    document.getElementById("quick-title").textContent = title;
+    document.getElementById("quick-input").placeholder = placeholder;
+    document.getElementById("quick-input").value = "";
+    openSheet("sheet-quick");
+  }
+  document.getElementById("open-url-quick").addEventListener("click", () => openQuick("Открыть сайт","https://example.com","open_url","url"));
+  document.getElementById("extra-url").addEventListener("click", () => openQuick("Открыть сайт","https://example.com","open_url","url"));
+  document.getElementById("open-app-quick").addEventListener("click", () => openQuick("Открыть программу","Путь к .exe или имя программы","open_app","path"));
+  document.getElementById("open-folder-quick").addEventListener("click", () => openQuick("Открыть папку","Путь к папке","open_folder","path"));
+
+  document.getElementById("quick-send").addEventListener("click", async () => {
+    const val = document.getElementById("quick-input").value.trim();
+    if(!val || !quickAction) return;
+    const params = {}; params[quickParamKey] = val;
+    const result = await sendCommand(quickAction, params, {silent:true});
+    if(result){ toast("Выполнено", "ok"); closeSheet("sheet-quick"); }
+    else{ toast("Нет ответа от ПК — агент офлайн", "err"); }
+  });
+
+  document.getElementById("open-volume").addEventListener("click", () => openSheet("sheet-volume"));
+
+  document.getElementById("extra-settings").addEventListener("click", () => openSheet("sheet-settings"));
+
+  /* ---------------- Clipboard ---------------- */
+  document.getElementById("extra-clipboard").addEventListener("click", () => openSheet("sheet-clipboard"));
+  document.getElementById("clip-get").addEventListener("click", async () => {
+    const result = await sendCommand("clipboard_get", {}, {silent:true, timeout:15000});
+    if(result && result.text !== undefined){ document.getElementById("clip-text").value = result.text; toast("Буфер получен", "ok"); }
+    else{ toast("Нет ответа от ПК — агент офлайн", "err"); }
+  });
+  document.getElementById("clip-set").addEventListener("click", async () => {
+    const text = document.getElementById("clip-text").value;
+    const result = await sendCommand("clipboard_set", {text}, {silent:true});
+    toast(result ? "Отправлено в буфер ПК" : "Нет ответа от ПК — агент офлайн", result ? "ok":"err");
+  });
+
+  /* ---------------- Music ---------------- */
+  document.getElementById("extra-music").addEventListener("click", () => openSheet("sheet-music"));
+  document.querySelectorAll("[data-music]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const result = await sendCommand("music_control", {action: btn.dataset.music}, {silent:true});
+      if(result && result.track) document.getElementById("music-track").textContent = result.track;
+      toast(result ? "Команда отправлена" : "Нет ответа от ПК — агент офлайн", result ? "ok":"err");
+    });
+  });
+
+  /* ---------------- Mouse / touchpad ---------------- */
+  document.getElementById("extra-mouse").addEventListener("click", () => openSheet("sheet-mouse"));
+  (function(){
+    const pad = document.getElementById("touchpad");
+    let lastX = 0, lastY = 0, accX = 0, accY = 0, sending = false;
+    pad.addEventListener("touchstart", e => { const t = e.touches[0]; lastX = t.clientX; lastY = t.clientY; }, {passive:true});
+    pad.addEventListener("touchmove", e => {
+      const t = e.touches[0];
+      accX += t.clientX - lastX; accY += t.clientY - lastY;
+      lastX = t.clientX; lastY = t.clientY;
+      if(!sending){
+        sending = true;
+        setTimeout(() => {
+          if(Math.abs(accX) > 1 || Math.abs(accY) > 1){ sendCommand("mouse_move", {dx: Math.round(accX), dy: Math.round(accY)}, {silent:true}); }
+          accX = 0; accY = 0; sending = false;
+        }, 90);
+      }
+    }, {passive:true});
+  })();
+  document.getElementById("mouse-left").addEventListener("click", async () => {
+    const r = await sendCommand("mouse_click", {button:"left"}, {silent:true});
+    toast(r ? "Клик" : "Нет ответа от ПК", r ? "ok":"err");
+  });
+  document.getElementById("mouse-right").addEventListener("click", async () => {
+    const r = await sendCommand("mouse_click", {button:"right"}, {silent:true});
+    toast(r ? "Клик" : "Нет ответа от ПК", r ? "ok":"err");
+  });
+
+  /* ---------------- Keyboard ---------------- */
+  document.getElementById("extra-keyboard").addEventListener("click", () => openSheet("sheet-keyboard"));
+  document.getElementById("kb-send").addEventListener("click", async () => {
+    const text = document.getElementById("kb-text").value;
+    if(!text) return;
+    const result = await sendCommand("keyboard_type", {text}, {silent:true});
+    if(result){ toast("Введено на ПК", "ok"); document.getElementById("kb-text").value = ""; }
+    else{ toast("Нет ответа от ПК — агент офлайн", "err"); }
+  });
+  document.querySelectorAll("[data-key]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const result = await sendCommand("keyboard_key", {key: btn.dataset.key}, {silent:true});
+      toast(result ? "Отправлено" : "Нет ответа от ПК", result ? "ok":"err");
+    });
+  });
+
+  const metrics = [
+    {key:"cpu", label:"Процессор", icon:"🧠"},
+    {key:"gpu", label:"Видеокарта", icon:"🎮"},
+    {key:"ram", label:"Память", icon:"💾"},
+    {key:"disk", label:"Диски", icon:"💿"},
+    {key:"temp", label:"Температура", icon:"🌡"},
+    {key:"net", label:"Сеть", icon:"⚡"},
+  ];
+  const metricGrid = document.getElementById("metric-grid");
+  metrics.forEach(m => {
+    const el = document.createElement("div");
+    el.className = "metric-card glass";
+    el.id = "metric-" + m.key;
+    el.innerHTML = '<div class="metric-top"><span class="lbl">' + m.icon + ' ' + m.label + '</span><span class="val">—</span></div><div class="pbar"><div class="pbar-fill"></div></div>';
+    metricGrid.appendChild(el);
+  });
+
+  function makeChart(ctx, color){
+    return new Chart(ctx, {
+      type:"line",
+      data:{ labels:[], datasets:[{ data:[], borderColor:color, backgroundColor:color+"22", borderWidth:2, tension:.35, pointRadius:0, fill:true }] },
+      options:{
+        responsive:true, maintainAspectRatio:false, animation:{duration:400},
+        plugins:{ legend:{display:false} },
+        scales:{
+          x:{ display:false },
+          y:{ beginAtZero:true, max:100, grid:{ color:"rgba(255,255,255,.06)" }, ticks:{ color:"rgba(255,255,255,.35)", font:{size:9} } }
+        }
+      }
+    });
+  }
+  const charts = {
+    cpu: makeChart(document.getElementById("chart-cpu"), "#2AABEE"),
+    ram: makeChart(document.getElementById("chart-ram"), "#22C55E"),
+    gpu: makeChart(document.getElementById("chart-gpu"), "#F59E0B"),
+    temp: makeChart(document.getElementById("chart-temp"), "#EF4444"),
+  };
+  function pushChart(chart, value){
+    const now = new Date().toLocaleTimeString().slice(0,5);
+    chart.data.labels.push(now);
+    chart.data.datasets[0].data.push(value);
+    if(chart.data.labels.length > 12){ chart.data.labels.shift(); chart.data.datasets[0].data.shift(); }
+    chart.update();
+  }
+
+  document.getElementById("refresh-stats").addEventListener("click", async () => {
+    const result = await sendCommand("stats", {}, {silent:true, timeout:20000});
+    if(!result){
+      document.getElementById("stats-status-text").textContent = "агент офлайн";
+      document.getElementById("stats-dot").classList.add("off");
+      toast("Нет ответа от ПК — агент ещё не подключён", "err");
+      return;
+    }
+    document.getElementById("stats-status-text").textContent = "online";
+    document.getElementById("stats-dot").classList.remove("off");
+    metrics.forEach(m => {
+      const v = result[m.key];
+      if(v === undefined) return;
+      const el = document.getElementById("metric-" + m.key);
+      el.querySelector(".val").textContent = typeof v === "number" ? v + "%" : v;
+      el.querySelector(".pbar-fill").style.width = (typeof v === "number" ? v : 0) + "%";
+    });
+    if(typeof result.cpu === "number") pushChart(charts.cpu, result.cpu);
+    if(typeof result.ram === "number") pushChart(charts.ram, result.ram);
+    if(typeof result.gpu === "number") pushChart(charts.gpu, result.gpu);
+    if(typeof result.temp === "number") pushChart(charts.temp, result.temp);
+    if(result.uptime) document.getElementById("pc-uptime").textContent = result.uptime;
+  });
+
+  async function checkConnection(){
+    try{
+      const res = await fetch(SERVER_URL + "/");
+      if(res.ok){
+        document.getElementById("pc-status-text").textContent = "сервер онлайн";
+        document.getElementById("settings-status").textContent = "Сервер онлайн";
+      } else { throw new Error(); }
+    }catch(e){
+      document.getElementById("pc-dot").classList.add("off");
+      document.getElementById("pc-status-text").textContent = "сервер недоступен";
+      document.getElementById("settings-status").textContent = "Сервер недоступен";
+    }
+  }
+</script>
+</body>
+</html>
