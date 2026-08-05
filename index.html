@@ -97,8 +97,37 @@
   .header h1{ margin:2px 0 0; font-size:26px; font-weight:800; letter-spacing:-.02em; }
 
   .page-viewport{ overflow:hidden; }
-  .pages{ display:flex; width:300%; transition:transform .38s cubic-bezier(.4,0,.2,1); }
-  .page{ width:33.3333%; flex-shrink:0; padding:6px 20px 20px; }
+  .pages{ display:flex; width:400%; transition:transform .38s cubic-bezier(.4,0,.2,1); }
+  .page{ width:25%; flex-shrink:0; padding:6px 20px 20px; }
+
+  .proc-row, .sched-row{
+    display:flex; align-items:center; gap:12px; padding:12px 4px;
+    border-bottom:1px solid rgba(255,255,255,.06);
+  }
+  .proc-row .name{ flex:1; font-size:13px; font-weight:600; }
+  .proc-row .meta{ font-size:11px; color:var(--text-dim); }
+  .kill-btn{
+    border:none; background:rgba(239,68,68,.15); color:var(--error);
+    font-size:11px; font-weight:700; padding:7px 10px; border-radius:10px; cursor:pointer;
+  }
+  .sched-row .info{ flex:1; }
+  .sched-row .time{ font-size:14px; font-weight:700; }
+  .sched-row .days{ font-size:11px; color:var(--text-dim); }
+  .del-btn{
+    border:none; background:var(--card); color:var(--text-dim);
+    font-size:14px; padding:7px 11px; border-radius:10px; cursor:pointer;
+  }
+  .day-pills{ display:flex; gap:6px; flex-wrap:wrap; margin:12px 0; }
+  .day-pill{
+    padding:8px 12px; border-radius:20px; font-size:12px; font-weight:600; cursor:pointer;
+    background:var(--card); border:1px solid var(--card-border); color:var(--text-dim);
+  }
+  .day-pill.on{ background:var(--accent-soft); color:var(--accent); border-color:var(--accent-dim,var(--accent)); }
+  .notif-card{ padding:14px 16px; margin-bottom:10px; }
+  .notif-card .title{ font-size:13.5px; font-weight:700; margin-bottom:3px; }
+  .notif-card .body{ font-size:12.5px; color:var(--text-dim); }
+  .notif-card .time{ font-size:10.5px; color:var(--text-faint); margin-top:6px; }
+  .empty-note{ text-align:center; color:var(--text-faint); font-size:13px; padding:30px 0; }
 
   .glass{
     background:var(--card);
@@ -350,6 +379,8 @@
           <button class="action-card glass" id="open-folder-quick"><span class="ico">📁</span><span class="lbl">Открыть папку</span></button>
           <button class="action-card glass" id="open-cmd"><span class="ico">⌨️</span><span class="lbl">CMD</span></button>
           <button class="action-card glass" id="open-volume"><span class="ico">🔊</span><span class="lbl">Громкость</span></button>
+          <button class="action-card glass" id="open-tasks"><span class="ico">🧮</span><span class="lbl">Диспетчер задач</span></button>
+          <button class="action-card glass" id="open-schedule"><span class="ico">📅</span><span class="lbl">Расписание</span></button>
         </div>
       </div>
 
@@ -396,6 +427,10 @@
         <div class="list-card glass" id="extra-settings"><div class="ico">⚙️</div><div class="txt"><div class="lbl">Настройки</div></div><div class="chev">›</div></div>
       </div>
 
+      <div class="page">
+        <div id="notif-list"><div class="empty-note">Пока нет уведомлений</div></div>
+      </div>
+
     </div>
   </div>
 </div>
@@ -403,7 +438,8 @@
 <div class="bottom-nav glass">
   <button class="nav-item active" data-tab="0"><span class="ico">🏠</span><span>Управление</span></button>
   <button class="nav-item" data-tab="1"><span class="ico">📊</span><span>Статистика</span></button>
-  <button class="nav-item" data-tab="2"><span class="ico">⚙️</span><span>Дополнительно</span></button>
+  <button class="nav-item" data-tab="2"><span class="ico">⚙️</span><span>Доп.</span></button>
+  <button class="nav-item" data-tab="3"><span class="ico">🔔</span><span>Уведомления</span></button>
 </div>
 
 <div class="sheet" id="sheet-message">
@@ -513,6 +549,42 @@
   </div>
 </div>
 
+<div class="sheet" id="sheet-tasks">
+  <div class="sheet-header"><button class="back-btn" data-close="sheet-tasks">←</button><div class="sheet-title">Диспетчер задач</div></div>
+  <div class="sheet-body">
+    <button class="refresh-btn" id="tasks-refresh" style="margin-bottom:14px;"><span>🔄</span><span>Обновить список</span></button>
+    <div id="tasks-list"><div class="empty-note">Нажми "Обновить список"</div></div>
+  </div>
+</div>
+
+<div class="sheet" id="sheet-schedule">
+  <div class="sheet-header"><button class="back-btn" data-close="sheet-schedule">←</button><div class="sheet-title">Расписание</div></div>
+  <div class="sheet-body">
+    <div class="section-title" style="margin-top:0;">Новая задача</div>
+    <select class="field" id="sched-action" style="margin-bottom:10px;">
+      <option value="shutdown">🔴 Выключить</option>
+      <option value="reboot">🔄 Перезагрузить</option>
+      <option value="sleep">🌙 Сон</option>
+      <option value="lock">🔒 Заблокировать</option>
+    </select>
+    <input class="field" type="time" id="sched-time">
+    <div class="day-pills" id="sched-days">
+      <div class="day-pill" data-day="once">Один раз</div>
+      <div class="day-pill" data-day="mon">Пн</div>
+      <div class="day-pill" data-day="tue">Вт</div>
+      <div class="day-pill" data-day="wed">Ср</div>
+      <div class="day-pill" data-day="thu">Чт</div>
+      <div class="day-pill" data-day="fri">Пт</div>
+      <div class="day-pill" data-day="sat">Сб</div>
+      <div class="day-pill" data-day="sun">Вс</div>
+    </div>
+    <button class="primary-btn" id="sched-add">➕ Добавить</button>
+
+    <div class="section-title">Активные задачи</div>
+    <div id="sched-list"><div class="empty-note">Загрузка...</div></div>
+  </div>
+</div>
+
 <div class="sheet" id="sheet-settings">
   <div class="sheet-header"><button class="back-btn" data-close="sheet-settings">←</button><div class="sheet-title">Настройки</div></div>
   <div class="sheet-body">
@@ -554,16 +626,22 @@
   const tabMeta = [
     {title:"Мой ПК", eyebrow:"УПРАВЛЕНИЕ"},
     {title:"Статистика", eyebrow:"МОНИТОРИНГ"},
-    {title:"Дополнительно", eyebrow:"ИНСТРУМЕНТЫ"}
+    {title:"Дополнительно", eyebrow:"ИНСТРУМЕНТЫ"},
+    {title:"Уведомления", eyebrow:"ЛЕНТА С ПК"}
   ];
+  let statsInterval = null, notifInterval = null;
   document.querySelectorAll(".nav-item").forEach(btn => {
     btn.addEventListener("click", () => {
       const idx = parseInt(btn.dataset.tab, 10);
       document.querySelectorAll(".nav-item").forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
-      pagesEl.style.transform = "translateX(-" + (idx * 33.3333) + "%)";
+      pagesEl.style.transform = "translateX(-" + (idx * 25) + "%)";
       headerTitle.textContent = tabMeta[idx].title;
       headerEyebrow.textContent = tabMeta[idx].eyebrow;
+
+      clearInterval(statsInterval); clearInterval(notifInterval);
+      if(idx === 1){ refreshStats(); statsInterval = setInterval(refreshStats, 5000); }
+      if(idx === 3){ refreshNotifications(); notifInterval = setInterval(refreshNotifications, 6000); }
     });
   });
 
@@ -621,6 +699,10 @@
   });
 
   document.getElementById("power-btn").addEventListener("click", async function(){
+    if(!pcOnline){
+      toast("Включение по Wi-Fi ещё не подключено к боту — нужен отдельный триггер-девайс в локальной сети (обсуждали отдельно)", "info", "🔧");
+      return;
+    }
     this.disabled = true;
     const result = await sendCommand("shutdown", {}, {label:"Выключение"});
     this.disabled = false;
@@ -702,6 +784,26 @@
       row.addEventListener("click", () => {
         if(entry.type === "dir") loadExplorer(path.replace(/\\?$/, "\\") + entry.name);
       });
+      if(entry.type === "file"){
+        const dl = document.createElement("button");
+        dl.className = "kill-btn"; dl.style.background = "var(--accent-soft)"; dl.style.color = "var(--accent)";
+        dl.textContent = "⬇";
+        dl.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          toast("Скачиваю " + entry.name + "...", "info");
+          const fullPath = path.replace(/\\?$/, "\\") + entry.name;
+          const result = await sendCommand("download_file", {path: fullPath}, {silent:true, timeout:20000});
+          if(result && result.data){
+            const a = document.createElement("a");
+            a.href = result.data; a.download = result.filename || entry.name;
+            document.body.appendChild(a); a.click(); a.remove();
+            toast("Файл скачан", "ok");
+          } else {
+            toast((result && result.error) || "Не удалось скачать файл", "err");
+          }
+        });
+        row.appendChild(dl);
+      }
       list.appendChild(row);
     });
   }
@@ -805,8 +907,8 @@
     {key:"gpu", label:"Видеокарта", icon:"🎮"},
     {key:"ram", label:"Память", icon:"💾"},
     {key:"disk", label:"Диски", icon:"💿"},
-    {key:"temp", label:"Температура", icon:"🌡"},
-    {key:"net", label:"Сеть", icon:"⚡"},
+    {key:"temp", label:"CPU темп.", icon:"🌡"},
+    {key:"gpu_temp", label:"GPU темп.", icon:"🌡"},
   ];
   const metricGrid = document.getElementById("metric-grid");
   metrics.forEach(m => {
@@ -845,12 +947,11 @@
     chart.update();
   }
 
-  document.getElementById("refresh-stats").addEventListener("click", async () => {
+  async function refreshStats(){
     const result = await sendCommand("stats", {}, {silent:true, timeout:20000});
     if(!result){
       document.getElementById("stats-status-text").textContent = "агент офлайн";
       document.getElementById("stats-dot").classList.add("off");
-      toast("Нет ответа от ПК — агент ещё не подключён", "err");
       return;
     }
     document.getElementById("stats-status-text").textContent = "online";
@@ -859,28 +960,147 @@
       const v = result[m.key];
       if(v === undefined) return;
       const el = document.getElementById("metric-" + m.key);
-      el.querySelector(".val").textContent = typeof v === "number" ? v + "%" : v;
-      el.querySelector(".pbar-fill").style.width = (typeof v === "number" ? v : 0) + "%";
+      const isTemp = m.key.includes("temp");
+      el.querySelector(".val").textContent = isTemp ? (v ? v + "°C" : "н/д") : v + "%";
+      el.querySelector(".pbar-fill").style.width = (isTemp ? Math.min(v,100) : v) + "%";
     });
     if(typeof result.cpu === "number") pushChart(charts.cpu, result.cpu);
     if(typeof result.ram === "number") pushChart(charts.ram, result.ram);
     if(typeof result.gpu === "number") pushChart(charts.gpu, result.gpu);
     if(typeof result.temp === "number") pushChart(charts.temp, result.temp);
     if(result.uptime) document.getElementById("pc-uptime").textContent = result.uptime;
-  });
+    if(result.usage_today) document.getElementById("u-today").textContent = result.usage_today;
+    if(result.usage_week) document.getElementById("u-week").textContent = result.usage_week;
+    if(result.usage_month) document.getElementById("u-month").textContent = result.usage_month;
+    if(result.usage_session) document.getElementById("u-session").textContent = result.usage_session;
+    if(result.usage_total) document.getElementById("u-total").textContent = result.usage_total;
+  }
+  document.getElementById("refresh-stats").addEventListener("click", refreshStats);
+
+  let pcOnline = false;
 
   async function checkConnection(){
     try{
-      const res = await fetch(SERVER_URL + "/");
-      if(res.ok){
-        document.getElementById("pc-status-text").textContent = "сервер онлайн";
-        document.getElementById("settings-status").textContent = "Сервер онлайн";
-      } else { throw new Error(); }
+      const res = await fetch(SERVER_URL + "/api/status");
+      const data = await res.json();
+      pcOnline = !!data.online;
+      const dot = document.getElementById("pc-dot");
+      const txt = document.getElementById("pc-status-text");
+      const powerBtn = document.getElementById("power-btn");
+      if(pcOnline){
+        dot.classList.remove("off");
+        txt.textContent = "online";
+        powerBtn.innerHTML = '<span class="ico">🔴</span><span>Выключить ПК</span>';
+        document.getElementById("settings-status").textContent = "ПК online";
+      } else {
+        dot.classList.add("off");
+        txt.textContent = "офлайн / спит";
+        powerBtn.innerHTML = '<span class="ico">🟢</span><span>Включить ПК</span>';
+        document.getElementById("settings-status").textContent = "ПК не отвечает";
+      }
     }catch(e){
       document.getElementById("pc-dot").classList.add("off");
       document.getElementById("pc-status-text").textContent = "сервер недоступен";
       document.getElementById("settings-status").textContent = "Сервер недоступен";
     }
+  }
+  setInterval(checkConnection, 6000);
+
+  /* ---------------- Task manager ---------------- */
+  document.getElementById("open-tasks").addEventListener("click", () => openSheet("sheet-tasks"));
+  document.getElementById("tasks-refresh").addEventListener("click", async () => {
+    const list = document.getElementById("tasks-list");
+    list.innerHTML = '<div class="spin"></div>';
+    const result = await sendCommand("list_processes", {}, {silent:true, timeout:15000});
+    if(!result || !result.processes){ list.innerHTML = '<div class="empty-note">⏱ Нет ответа от ПК</div>'; return; }
+    list.innerHTML = "";
+    result.processes.forEach(p => {
+      const row = document.createElement("div");
+      row.className = "proc-row";
+      row.innerHTML = `<div class="name">${p.name}<div class="meta">PID ${p.pid} · CPU ${p.cpu}% · RAM ${p.mem}%</div></div>`;
+      const btn = document.createElement("button");
+      btn.className = "kill-btn"; btn.textContent = "Завершить";
+      btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        const r = await sendCommand("kill_process", {pid: p.pid}, {silent:true});
+        toast(r && !r.error ? "Процесс завершён" : "Не удалось завершить", r && !r.error ? "ok":"err");
+        if(r && !r.error) row.remove();
+        btn.disabled = false;
+      });
+      row.appendChild(btn);
+      list.appendChild(row);
+    });
+  });
+
+  /* ---------------- Schedule ---------------- */
+  const selectedDays = new Set();
+  document.querySelectorAll(".day-pill").forEach(pill => {
+    pill.addEventListener("click", () => {
+      const day = pill.dataset.day;
+      if(day === "once"){
+        selectedDays.clear();
+        document.querySelectorAll(".day-pill").forEach(p => p.classList.remove("on"));
+        pill.classList.add("on");
+      } else {
+        document.querySelector('.day-pill[data-day="once"]').classList.remove("on");
+        pill.classList.toggle("on");
+      }
+    });
+  });
+  function getSelectedDays(){
+    const days = [...document.querySelectorAll(".day-pill.on")].map(p => p.dataset.day);
+    return days.length ? days : ["once"];
+  }
+  async function loadSchedule(){
+    const list = document.getElementById("sched-list");
+    list.innerHTML = '<div class="spin"></div>';
+    const result = await sendCommand("schedule_list", {}, {silent:true, timeout:15000});
+    if(!result || !result.items){ list.innerHTML = '<div class="empty-note">⏱ Нет ответа от ПК</div>'; return; }
+    if(!result.items.length){ list.innerHTML = '<div class="empty-note">Пока ничего не запланировано</div>'; return; }
+    const actionNames = {shutdown:"🔴 Выключение", reboot:"🔄 Перезагрузка", sleep:"🌙 Сон", lock:"🔒 Блокировка"};
+    const dayNames = {once:"Один раз", mon:"Пн",tue:"Вт",wed:"Ср",thu:"Чт",fri:"Пт",sat:"Сб",sun:"Вс"};
+    list.innerHTML = "";
+    result.items.forEach(it => {
+      const row = document.createElement("div");
+      row.className = "sched-row";
+      row.innerHTML = `<div class="info"><div class="time">${it.time} — ${actionNames[it.action]||it.action}</div><div class="days">${it.days.map(d=>dayNames[d]||d).join(", ")}</div></div>`;
+      const del = document.createElement("button");
+      del.className = "del-btn"; del.textContent = "✕";
+      del.addEventListener("click", async () => {
+        await sendCommand("schedule_remove", {id: it.id}, {silent:true});
+        row.remove();
+      });
+      row.appendChild(del);
+      list.appendChild(row);
+    });
+  }
+  document.getElementById("open-schedule").addEventListener("click", () => { openSheet("sheet-schedule"); loadSchedule(); });
+  document.getElementById("sched-add").addEventListener("click", async () => {
+    const action = document.getElementById("sched-action").value;
+    const time = document.getElementById("sched-time").value;
+    if(!time){ toast("Укажи время", "err"); return; }
+    const result = await sendCommand("schedule_add", {action, time, days: getSelectedDays()}, {silent:true});
+    toast(result ? "Добавлено в расписание" : "Нет ответа от ПК", result ? "ok":"err");
+    if(result) loadSchedule();
+  });
+
+  /* ---------------- Notifications ---------------- */
+  async function refreshNotifications(){
+    if(!initData) return;
+    try{
+      const res = await fetch(SERVER_URL + "/api/notifications?initData=" + encodeURIComponent(initData));
+      const data = await res.json();
+      const list = document.getElementById("notif-list");
+      if(!data.items || !data.items.length){ list.innerHTML = '<div class="empty-note">Пока нет уведомлений</div>'; return; }
+      list.innerHTML = "";
+      data.items.forEach(n => {
+        const card = document.createElement("div");
+        card.className = "notif-card glass";
+        const time = new Date(n.ts * 1000).toLocaleTimeString().slice(0,5);
+        card.innerHTML = `<div class="title">${n.title || "Уведомление"}</div><div class="body">${n.body || ""}</div><div class="time">${time}</div>`;
+        list.appendChild(card);
+      });
+    }catch(e){}
   }
 </script>
 </body>
