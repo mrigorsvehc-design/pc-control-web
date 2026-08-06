@@ -1055,6 +1055,7 @@
     temp: makeChart(document.getElementById("chart-temp"), "#EF4444"),
   };
   function pushChart(chart, value){
+    if(!chart) return;
     const now = new Date().toLocaleTimeString().slice(0,5);
     chart.data.labels.push(now);
     chart.data.datasets[0].data.push(value);
@@ -1071,24 +1072,30 @@
     }
     document.getElementById("stats-status-text").textContent = "online";
     document.getElementById("stats-dot").classList.remove("off");
-    metrics.forEach(m => {
-      const v = result[m.key];
-      if(v === undefined) return;
-      const el = document.getElementById("metric-" + m.key);
-      const isTemp = m.key.includes("temp");
-      el.querySelector(".val").textContent = isTemp ? (v ? v + "°C" : "н/д") : v + "%";
-      el.querySelector(".pbar-fill").style.width = (isTemp ? Math.min(v,100) : v) + "%";
-    });
-    if(typeof result.cpu === "number") pushChart(charts.cpu, result.cpu);
-    if(typeof result.ram === "number") pushChart(charts.ram, result.ram);
-    if(typeof result.gpu === "number") pushChart(charts.gpu, result.gpu);
-    if(typeof result.temp === "number") pushChart(charts.temp, result.temp);
+    try{
+      metrics.forEach(m => {
+        const v = result[m.key];
+        if(v === undefined) return;
+        const el = document.getElementById("metric-" + m.key);
+        const isTemp = m.key.includes("temp");
+        el.querySelector(".val").textContent = isTemp ? (v ? v + "°C" : "н/д") : v + "%";
+        el.querySelector(".pbar-fill").style.width = (isTemp ? Math.min(v,100) : v) + "%";
+      });
+    }catch(e){ console.error("metrics render error", e); }
+
     if(result.uptime) document.getElementById("pc-uptime").textContent = result.uptime;
     if(result.usage_today) document.getElementById("u-today").textContent = result.usage_today;
     if(result.usage_week) document.getElementById("u-week").textContent = result.usage_week;
     if(result.usage_month) document.getElementById("u-month").textContent = result.usage_month;
     if(result.usage_session) document.getElementById("u-session").textContent = result.usage_session;
     if(result.usage_total) document.getElementById("u-total").textContent = result.usage_total;
+
+    try{
+      if(typeof result.cpu === "number") pushChart(charts.cpu, result.cpu);
+      if(typeof result.ram === "number") pushChart(charts.ram, result.ram);
+      if(typeof result.gpu === "number") pushChart(charts.gpu, result.gpu);
+      if(typeof result.temp === "number") pushChart(charts.temp, result.temp);
+    }catch(e){ console.error("chart render error", e); }
   }
   document.getElementById("refresh-stats").addEventListener("click", refreshStats);
 
