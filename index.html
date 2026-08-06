@@ -1065,6 +1065,7 @@
 
   async function refreshStats(){
     const result = await sendCommand("stats", {}, {silent:true, timeout:20000});
+    console.log("[stats result]", result);
     if(!result){
       document.getElementById("stats-status-text").textContent = "агент офлайн";
       document.getElementById("stats-dot").classList.add("off");
