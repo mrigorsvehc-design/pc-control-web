@@ -17,6 +17,7 @@
     --card-strong: rgba(255,255,255,0.13);
     --accent: #2AABEE;
     --accent-soft: rgba(42,171,238,0.18);
+    --accent-dim: #2C7A99;
     --success: #22C55E;
     --error: #EF4444;
     --warning: #F59E0B;
@@ -26,6 +27,27 @@
     --radius-lg: 26px;
     --radius-md: 20px;
     --radius-sm: 14px;
+  }
+  body.theme-redblack{
+    --bg: #0A0505;
+    --card: rgba(255,59,48,0.07);
+    --card-border: rgba(255,59,48,0.18);
+    --card-strong: rgba(255,59,48,0.14);
+    --accent: #FF3B30;
+    --accent-soft: rgba(255,59,48,0.18);
+    --accent-dim: #8C231D;
+  }
+  body.theme-purple{
+    --bg: #0B0712;
+    --card: rgba(167,139,250,0.08);
+    --card-border: rgba(167,139,250,0.2);
+    --card-strong: rgba(167,139,250,0.16);
+    --accent: #A78BFA;
+    --accent-soft: rgba(167,139,250,0.2);
+    --accent-dim: #5B4B8A;
+    --success: #C4B5FD;
+    --error: #7C3AED;
+    --warning: #A78BFA;
   }
   *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   html,body{ height:100%; }
@@ -365,6 +387,7 @@
         </div>
 
         <button class="power-btn" id="power-btn"><span class="ico">🔴</span><span>Выключить ПК</span></button>
+        <button class="power-btn" id="alarm-btn" style="background:linear-gradient(155deg, rgba(245,158,11,.22), rgba(245,158,11,.06)); border-color:rgba(245,158,11,.35);"><span class="ico">🚨</span><span>Сигналка</span></button>
 
         <div class="grid3">
           <button class="action-card glass" data-action="sleep" data-label="Сон"><span class="ico">🌙</span><span class="lbl">Сон</span></button>
@@ -379,7 +402,6 @@
           <button class="action-card glass" id="open-folder-quick"><span class="ico">📁</span><span class="lbl">Открыть папку</span></button>
           <button class="action-card glass" id="open-cmd"><span class="ico">⌨️</span><span class="lbl">CMD</span></button>
           <button class="action-card glass" id="open-volume"><span class="ico">🔊</span><span class="lbl">Громкость</span></button>
-          <button class="action-card glass" id="open-tasks"><span class="ico">🧮</span><span class="lbl">Диспетчер задач</span></button>
           <button class="action-card glass" id="open-schedule"><span class="ico">📅</span><span class="lbl">Расписание</span></button>
         </div>
       </div>
@@ -549,14 +571,6 @@
   </div>
 </div>
 
-<div class="sheet" id="sheet-tasks">
-  <div class="sheet-header"><button class="back-btn" data-close="sheet-tasks">←</button><div class="sheet-title">Диспетчер задач</div></div>
-  <div class="sheet-body">
-    <button class="refresh-btn" id="tasks-refresh" style="margin-bottom:14px;"><span>🔄</span><span>Обновить список</span></button>
-    <div id="tasks-list"><div class="empty-note">Нажми "Обновить список"</div></div>
-  </div>
-</div>
-
 <div class="sheet" id="sheet-schedule">
   <div class="sheet-header"><button class="back-btn" data-close="sheet-schedule">←</button><div class="sheet-title">Расписание</div></div>
   <div class="sheet-body">
@@ -590,6 +604,17 @@
   <div class="sheet-body">
     <div class="list-card glass"><div class="ico">🌐</div><div class="txt"><div class="lbl">Сервер</div><div class="sub" id="settings-server"></div></div></div>
     <div class="list-card glass"><div class="ico">📶</div><div class="txt"><div class="lbl">Статус связи</div><div class="sub" id="settings-status">—</div></div></div>
+
+    <div class="section-title">Оформление</div>
+    <div class="grid3">
+      <button class="action-card glass" data-theme="default"><span class="ico">🔵</span><span class="lbl">Синяя</span></button>
+      <button class="action-card glass" data-theme="redblack"><span class="ico">🔴</span><span class="lbl">Чёрно-красная</span></button>
+      <button class="action-card glass" data-theme="purple"><span class="ico">🟣</span><span class="lbl">Фиолет. моно</span></button>
+    </div>
+
+    <div class="section-title">Лог команд</div>
+    <button class="refresh-btn" id="log-refresh"><span>🔄</span><span>Обновить лог</span></button>
+    <div id="log-list"><div class="empty-note">Нажми "Обновить лог"</div></div>
   </div>
 </div>
 
@@ -654,7 +679,7 @@
   async function sendCommand(action, params, opts){
     opts = opts || {};
     if(!initData){
-      toast("Открой приложение через кнопку бота в Telegram", "err");
+      if(!opts.silent) toast("Открой приложение через кнопку бота в Telegram", "err");
       return null;
     }
     if(!opts.silent) toast('Отправляю команду «' + (opts.label || action) + '»...', "info");
@@ -833,7 +858,97 @@
 
   document.getElementById("open-volume").addEventListener("click", () => openSheet("sheet-volume"));
 
-  document.getElementById("extra-settings").addEventListener("click", () => openSheet("sheet-settings"));
+  document.getElementById("extra-settings").addEventListener("click", () => { openSheet("sheet-settings"); loadLog(); });
+
+  /* ---------------- Themes ---------------- */
+  function applyTheme(theme){
+    document.body.classList.remove("theme-redblack", "theme-purple");
+    if(theme === "redblack") document.body.classList.add("theme-redblack");
+    if(theme === "purple") document.body.classList.add("theme-purple");
+    document.querySelectorAll("[data-theme]").forEach(b => {
+      b.style.borderColor = b.dataset.theme === theme ? "var(--accent)" : "";
+    });
+  }
+  async function loadTheme(){
+    try{
+      const res = await fetch(SERVER_URL + "/api/theme");
+      const data = await res.json();
+      applyTheme(data.theme || "default");
+    }catch(e){}
+  }
+  document.querySelectorAll("[data-theme]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const theme = btn.dataset.theme;
+      applyTheme(theme);
+      if(!initData) return;
+      try{
+        await fetch(SERVER_URL + "/api/theme", {
+          method:"POST", headers:{"Content-Type":"application/json"},
+          body: JSON.stringify({ initData, theme })
+        });
+      }catch(e){}
+    });
+  });
+  loadTheme();
+
+  /* ---------------- Log ---------------- */
+  const actionLabels = {
+    shutdown:"🔴 Выключение", reboot:"🔄 Перезагрузка", sleep:"🌙 Сон", standby:"⏳ Ожидание",
+    lock:"🔒 Блокировка", minimize_windows:"🪟 Свернуть окна", screenshot:"📸 Скриншот",
+    message:"💬 Сообщение", open_url:"🌐 Открыть сайт", open_app:"📂 Открыть программу",
+    open_folder:"📁 Открыть папку", cmd:"⌨️ CMD", list_dir:"📂 Проводник", download_file:"⬇ Скачивание",
+    stats:"📊 Статистика", volume_up:"🔊 Громче", volume_down:"🔉 Тише", volume_mute:"🔇 Без звука",
+    clipboard_get:"📋 Буфер (получить)", clipboard_set:"📋 Буфер (отправить)", music_control:"🎵 Музыка",
+    mouse_move:"🖱 Мышь", mouse_click:"🖱 Клик", keyboard_type:"⌨️ Ввод текста", keyboard_key:"⌨️ Клавиша",
+    schedule_add:"📅 Расписание +", schedule_list:"📅 Расписание", schedule_remove:"📅 Расписание −",
+    alarm_start:"🚨 Сигналка вкл", alarm_stop:"🚨 Сигналка выкл",
+  };
+  async function loadLog(){
+    if(!initData) return;
+    const list = document.getElementById("log-list");
+    list.innerHTML = '<div class="spin"></div>';
+    try{
+      const res = await fetch(SERVER_URL + "/api/log?initData=" + encodeURIComponent(initData));
+      const data = await res.json();
+      if(!data.items || !data.items.length){ list.innerHTML = '<div class="empty-note">Пока пусто</div>'; return; }
+      list.innerHTML = "";
+      data.items.forEach(it => {
+        const row = document.createElement("div");
+        row.className = "sched-row";
+        const time = new Date(it.ts * 1000).toLocaleTimeString().slice(0,5);
+        const statusIcon = it.status === "done" ? "✅" : "🟡";
+        row.innerHTML = `<div class="info"><div class="time">${actionLabels[it.action] || it.action}</div><div class="days">${time}</div></div><div>${statusIcon}</div>`;
+        list.appendChild(row);
+      });
+    }catch(e){
+      list.innerHTML = '<div class="empty-note">Не удалось загрузить</div>';
+    }
+  }
+  document.getElementById("log-refresh").addEventListener("click", loadLog);
+
+  /* ---------------- Alarm ---------------- */
+  let alarmActive = false;
+  document.getElementById("alarm-btn").addEventListener("click", async function(){
+    this.disabled = true;
+    if(!alarmActive){
+      const result = await sendCommand("alarm_start", {}, {label:"Сигналка"});
+      if(result){
+        alarmActive = true;
+        this.innerHTML = '<span class="ico">🛑</span><span>Остановить сигнал</span>';
+        this.style.background = "linear-gradient(155deg, rgba(239,68,68,.3), rgba(239,68,68,.1))";
+        this.style.borderColor = "rgba(239,68,68,.5)";
+      }
+    } else {
+      const result = await sendCommand("alarm_stop", {}, {label:"Стоп сигнал"});
+      if(result){
+        alarmActive = false;
+        this.innerHTML = '<span class="ico">🚨</span><span>Сигналка</span>';
+        this.style.background = "linear-gradient(155deg, rgba(245,158,11,.22), rgba(245,158,11,.06))";
+        this.style.borderColor = "rgba(245,158,11,.35)";
+      }
+    }
+    this.disabled = false;
+  });
 
   /* ---------------- Clipboard ---------------- */
   document.getElementById("extra-clipboard").addEventListener("click", () => openSheet("sheet-clipboard"));
@@ -980,57 +1095,25 @@
   let pcOnline = false;
 
   async function checkConnection(){
-    try{
-      const res = await fetch(SERVER_URL + "/api/status");
-      const data = await res.json();
-      pcOnline = !!data.online;
-      const dot = document.getElementById("pc-dot");
-      const txt = document.getElementById("pc-status-text");
-      const powerBtn = document.getElementById("power-btn");
-      if(pcOnline){
-        dot.classList.remove("off");
-        txt.textContent = "online";
-        powerBtn.innerHTML = '<span class="ico">🔴</span><span>Выключить ПК</span>';
-        document.getElementById("settings-status").textContent = "ПК online";
-      } else {
-        dot.classList.add("off");
-        txt.textContent = "офлайн / спит";
-        powerBtn.innerHTML = '<span class="ico">🟢</span><span>Включить ПК</span>';
-        document.getElementById("settings-status").textContent = "ПК не отвечает";
-      }
-    }catch(e){
-      document.getElementById("pc-dot").classList.add("off");
-      document.getElementById("pc-status-text").textContent = "сервер недоступен";
-      document.getElementById("settings-status").textContent = "Сервер недоступен";
+    const dot = document.getElementById("pc-dot");
+    const txt = document.getElementById("pc-status-text");
+    const powerBtn = document.getElementById("power-btn");
+    // Проверяем через тот же канал команд, что и остальные функции — надёжнее отдельного эндпоинта
+    const result = await sendCommand("ping", {}, {silent:true, timeout:5000});
+    pcOnline = !!result;
+    if(pcOnline){
+      dot.classList.remove("off");
+      txt.textContent = "online";
+      powerBtn.innerHTML = '<span class="ico">🔴</span><span>Выключить ПК</span>';
+      document.getElementById("settings-status").textContent = "ПК online";
+    } else {
+      dot.classList.add("off");
+      txt.textContent = "офлайн / спит";
+      powerBtn.innerHTML = '<span class="ico">🟢</span><span>Включить ПК</span>';
+      document.getElementById("settings-status").textContent = "ПК не отвечает";
     }
   }
-  setInterval(checkConnection, 6000);
-
-  /* ---------------- Task manager ---------------- */
-  document.getElementById("open-tasks").addEventListener("click", () => openSheet("sheet-tasks"));
-  document.getElementById("tasks-refresh").addEventListener("click", async () => {
-    const list = document.getElementById("tasks-list");
-    list.innerHTML = '<div class="spin"></div>';
-    const result = await sendCommand("list_processes", {}, {silent:true, timeout:15000});
-    if(!result || !result.processes){ list.innerHTML = '<div class="empty-note">⏱ Нет ответа от ПК</div>'; return; }
-    list.innerHTML = "";
-    result.processes.forEach(p => {
-      const row = document.createElement("div");
-      row.className = "proc-row";
-      row.innerHTML = `<div class="name">${p.name}<div class="meta">PID ${p.pid} · CPU ${p.cpu}% · RAM ${p.mem}%</div></div>`;
-      const btn = document.createElement("button");
-      btn.className = "kill-btn"; btn.textContent = "Завершить";
-      btn.addEventListener("click", async () => {
-        btn.disabled = true;
-        const r = await sendCommand("kill_process", {pid: p.pid}, {silent:true});
-        toast(r && !r.error ? "Процесс завершён" : "Не удалось завершить", r && !r.error ? "ok":"err");
-        if(r && !r.error) row.remove();
-        btn.disabled = false;
-      });
-      row.appendChild(btn);
-      list.appendChild(row);
-    });
-  });
+  setInterval(checkConnection, 8000);
 
   /* ---------------- Schedule ---------------- */
   const selectedDays = new Set();
